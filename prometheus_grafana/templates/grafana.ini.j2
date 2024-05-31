@@ -1,4 +1,3 @@
-
 [log]
 mode = console
 
@@ -6,9 +5,10 @@ mode = console
 protocol = http
 http_addr = 0.0.0.0
 http_port = 3000
-root_url = %(protocol)s://%(http_addr)s:%(http_port)s/grafana/
+enforce_domain = false
+domain = labi.cloud-stacks.com
+root_url = %(protocol)s://%(domain)s:%(http_port)/grafana/
 serve_from_sub_path = true
 
 [auth]
 disable_login_form = false
-

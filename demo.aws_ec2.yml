@@ -34,3 +34,8 @@ hostnames:
 compose:
   ansible_host: public_ip_address
 
+
+
+# vars:
+#   subdomain: labi
+#   domain: cloud-stacks.com

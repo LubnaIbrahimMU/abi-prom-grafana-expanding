@@ -67,42 +67,55 @@
   notify:
     - Restart Grafana
 
-# - name: Add Prometheus as a Grafana datasource
-#   grafana_datasource:
-#     name: Prometheus
-#     datasource:
-#       type: prometheus
-#       url: http://localhost:3000/grafana
-#       grafana_user: "admin"
-#       grafana_password: "admin"
-#       org_id: "1"
-#       ds_type: "prometheus"
-#       ds_url: http://localhost:9090
-#       access: proxy
-#     state: present
+
+
+##l
+
+- name: Configure Nginx for WordPress and Grafana
+  template:
+    src: wordpress-grafana-nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+  notify:
+    - Reload Nginx
+
+- name: Ensure Nginx default site is enabled
+  file:
+    src: /etc/nginx/sites-available/default
+    dest: /etc/nginx/sites-enabled/default
+    state: link
+  notify:
+    - Reload Nginx
+
+
+##certbot
+
+# - name: Obtain SSL certificate
+#   command: >
+#     certbot --nginx -d labi.cloud-stacks.com --non-interactive --agree-tos --email lubnaibrahim000@gmail.com
+#   args:
+#     creates: /etc/letsencrypt/live/labi.cloud-stacks.com/fullchain.pem
+#   notify: Reload Nginx
+
+
+
+
+
 
 - name: Add Prometheus as a Grafana datasource
   community.grafana.grafana_datasource:
     name: "Prometheus"
-    grafana_url: http://localhost:3000/grafana
+    # grafana_url: http://localhost:3000/grafana
+    url: http://localhost:3000/grafana
     grafana_user: "admin"
     grafana_password: "admin"
     ds_type: "prometheus"
     ds_url: http://localhost:9090
+    is_default : true
 
 
-  
 
-# - name: Import Node Exporter dashboard to Grafana
-#   grafana_dashboard: 
-#     name: "Node Exporter Full"
-#     src: https://grafana.com/api/dashboards/1860/revisions/37/download
-#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
 
-# - name: Import Node Exporter dashboard to Grafana
-#   get_url: 
-#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
-#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+##
 
 - name: Ensure Grafana dashboards directory exists
   file:
@@ -114,6 +127,16 @@
   get_url:
     url: https://grafana.com/api/dashboards/1860/revisions/37/download
     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+- name: Check if downloaded JSON file exists
+  stat:
+    path: /var/lib/grafana/dashboards/node_exporter_full.json
+  register: json_file_stat
+
+- name: Fail if the JSON file does not exist
+  fail:
+    msg: "The downloaded JSON file does not exist."
+  when: not json_file_stat.stat.exists
 
 - name: Read the downloaded JSON file
   slurp:
@@ -128,6 +151,440 @@
         "overwrite": true,
         "folderId": 0
       }
+
+# - name: Check Grafana endpoint
+#   uri:
+#     url: "https://labi.cloud-stacks.com/grafana"
+#     method: GET
+#     status_code: 200
+#   register: grafana_response
+
+# - name: Fail if Grafana endpoint is not accessible
+#   fail:
+#     msg: "Grafana endpoint is not accessible. HTTP Status: {{ grafana_response.status }}"
+#   when: grafana_response.status != 200
+
+
+- name: Check Grafana endpoint
+  uri:
+    url: "http://{{ subdomain }}.{{ domain }}/grafana"
+    method: GET
+    status_code: 200
+  register: grafana_response
+
+- name: Debug Grafana endpoint
+  debug:
+    var: grafana_response
+
+- name: Fail if Grafana endpoint is not accessible
+  fail:
+    msg: "Grafana endpoint is not accessible. HTTP Status: {{ grafana_response.status }}"
+  when: grafana_response.status != 200
+
+
+
+
+- name: Debug dashboard_payload
+  debug:
+    var: dashboard_payload
+
+
+- name: Import Grafana dashboard foo
+  uri:
+    url: "http://{{ subdomain }}.{{ domain }}/grafana/api/dashboards/db"
+
+    # url: "https://{{ subdomain }}.{{ domain }}/grafana"
+    follow_redirects: all
+    method: POST
+    user: "admin"
+    password: "admin"
+    force_basic_auth: yes
+    
+    headers:
+      Content-Type: "application/json"
+    body: "{{ dashboard_payload | to_json }}"
+    status_code: 200
+  register: result
+
+- debug:
+    var: result
+
+
+- name: Check Grafana endpoint
+  uri:
+    url: "http://{{ subdomain }}.{{ domain }}/grafana"
+    method: GET
+    status_code: 200
+  register: grafana_response
+
+- name: Debug Grafana endpoint
+  debug:
+    var: grafana_response
+
+- name: Fail if Grafana endpoint is not accessible
+  fail:
+    msg: "Grafana endpoint is not accessible. HTTP Status: {{ grafana_response.status }}"
+  when: grafana_response.status != 200
+
+
+# - name: Check Grafana URL with Cache-Control header
+#   uri:
+#     url: https://labi.cloud-stacks.com/grafana
+#     method: GET
+#     headers:
+#       Cache-Control: "no-cache, no-store, must-revalidate"
+#     follow_redirects: all
+#   register: result
+
+# - debug:
+#     msg: "Status: {{ result.status }}"
+
+# - debug:
+#     msg: "Response: {{ result }}"
+
+# - name: Handle 404 Error
+#   fail:
+#     msg: "Grafana not found at the specified URL. Please verify the URL and ensure Grafana is running."
+#   when: result.status == 404
+
+# - name: Check Grafana service status
+#   command: systemctl status grafana-server
+#   register: grafana_status
+#   ignore_errors: true
+
+# - debug:
+#     msg: "Grafana Service Status: {{ grafana_status.stdout }}"
+
+
+
+# - name: Check Grafana URL
+#   uri:
+#     url: "https://{{ subdomain }}.{{ domain }}/grafana"
+#     follow_redirects: all
+#   register: result
+
+# - debug:
+#     msg: "Status: {{ result.status }}"
+
+# - debug:
+#     msg: "Response: {{ result }}"
+
+# - name: Handle 404 Error
+#   fail:
+#     msg: "Grafana not found at the specified URL. Please verify the URL and ensure Grafana is running."
+#   when: result.status == 404
+
+
+
+
+##
+
+
+# - name: Add Prometheus as a Grafana datasource
+#   grafana_datasource:
+#     name: Prometheus
+#     datasource:
+#       type: prometheus
+#       url: http://localhost:3000/grafana
+#       grafana_user: "admin"
+#       grafana_password: "admin"
+#       org_id: "1"
+#       ds_type: "prometheus"
+#       ds_url: http://localhost:9090
+#       access: proxy
+#     state: present
+
+
+
+## nice
+# - name: Add Prometheus as a Grafana datasource
+#   community.grafana.grafana_datasource:
+#     name: "Prometheus"
+#     # grafana_url: http://localhost:3000/grafana
+#     url: http://localhost:3000/grafana
+#     grafana_user: "admin"
+#     grafana_password: "admin"
+#     ds_type: "prometheus"
+#     ds_url: http://localhost:9090
+#     is_default : true
+
+
+
+    
+
+# - name: Ensure Grafana dashboards directory exists
+#   file:
+#     path: /var/lib/grafana/dashboards
+#     state: directory
+#     mode: '0755'
+
+
+  
+
+# - name: Import Node Exporter dashboard to Grafana
+#   get_url: 
+#     url: "https://{{subdomain}}.{{domain}}/grafana"
+#     # dest: /var/lib/grafana/dashboards/node_exporter_full.json
+#     dest: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     url_user: "admin"
+#     url_password: "admin"
+#     # dashboard_url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     state: present
+
+
+
+
+
+
+# - name: Ensure Grafana dashboards directory exists
+#   file:
+#     path: /var/lib/grafana/dashboards
+#     state: directory
+#     mode: '0755'
+
+# # - name: Download Node Exporter dashboard JSON
+# #   get_url:
+# #     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+# #     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+# - name: Copy Node Exporter dashboard JSON from role files
+#   copy:
+#     src: node_exporter_full.json
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+
+# - name: Check if downloaded JSON file exists
+#   stat:
+#     path: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: json_file_stat
+
+# - name: Fail if the JSON file does not exist
+#   fail:
+#     msg: "The downloaded JSON file does not exist."
+#   when: not json_file_stat.stat.exists
+
+# - name: Read the downloaded JSON file
+#   slurp:
+#     src: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: dashboard_json
+
+# - name: Prepare dashboard import payload
+#   set_fact:
+#     dashboard_payload: >-
+#       {
+#         "dashboard": {{ dashboard_json.content | b64decode | from_json | to_json }},
+#         "overwrite": true,
+#         "folderId": 0
+#       }
+
+# - name: Debug dashboard_payload
+#   debug:
+#     var: dashboard_payload
+
+# - name: Import Grafana dashboard foo
+#   uri:
+#     url: "https://{{subdomain}}.{{domain}}/grafana/api/dashboards/db"
+#     method: POST
+#     user: "admin"
+#     password: "admin"
+#     force_basic_auth: yes
+#     headers:
+#       Content-Type: "application/json"
+#     body: "{{ dashboard_payload | to_json }}"
+#     status_code: 200
+#   register: result
+
+# - debug:
+#     var: result
+
+
+
+
+##########$
+
+# - name: Ensure Grafana dashboards directory exists
+#   file:
+#     path: /var/lib/grafana/dashboards
+#     state: directory
+#     mode: '0755'
+
+# - name: Download Node Exporter dashboard JSON
+#   get_url:
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+# - name: Read the downloaded JSON file
+#   slurp:
+#     src: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: dashboard_json
+
+# - name: Prepare dashboard import payload
+#   set_fact:
+#     dashboard_payload: >-
+#       {
+#         "dashboard": {{ dashboard_json.content | b64decode | from_json | to_json }},
+#         "overwrite": true,
+#         "folderId": 0
+#       }
+#$$
+# - name: Import Grafana dashboard foo
+#   uri:
+#     url: "https://{{subdomain}}.{{domain}}/grafana/api/dashboards/db"
+#     method: POST
+#     user: "admin"
+#     password: "admin"
+#     force_basic_auth: yes
+#     headers:
+#       Content-Type: "application/json"
+#     body: "{{ dashboard_payload | to_json }}"
+#     status_code: 200
+#     path: https://grafana.com/api/dashboards/1860/revisions/37/download
+#   register: result
+
+# - debug:
+#     var: result
+#######************
+
+##nice but to test the err foo
+# - name: Ensure Grafana dashboards directory exists
+#   file:
+#     path: /var/lib/grafana/dashboards
+#     state: directory
+#     mode: '0755'
+
+# - name: Download Node Exporter dashboard JSON
+#   get_url:
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+# - name: Check if downloaded JSON file exists
+#   stat:
+#     path: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: json_file_stat
+
+# - name: Fail if the JSON file does not exist
+#   fail:
+#     msg: "The downloaded JSON file does not exist."
+#   when: not json_file_stat.stat.exists
+
+# - name: Read the downloaded JSON file
+#   slurp:
+#     src: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: dashboard_json
+
+# - name: Prepare dashboard import payload
+#   set_fact:
+#     dashboard_payload: >-
+#       {
+#         "dashboard": {{ dashboard_json.content | b64decode | from_json | to_json }},
+#         "overwrite": true,
+#         "folderId": 0
+#       }
+
+# - name: Debug dashboard_payload
+#   debug:
+#     var: dashboard_payload
+
+# - name: Import Grafana dashboard foo
+#   uri:
+#     url: "https://{{ subdomain }}.{{ domain }}/grafana/api/dashboards/db"
+#     method: POST
+#     user: "admin"
+#     password: "admin"
+#     force_basic_auth: yes
+#     headers:
+#       Content-Type: "application/json"
+#     body: "{{ dashboard_payload | to_json }}"
+#     status_code: 200
+#   register: result
+
+# - debug:
+#     var: result
+
+
+
+###****
+
+
+###########################
+
+# - name: Ensure Grafana dashboards directory exists
+#   file:
+#     path: /var/lib/grafana/dashboards
+#     state: directory
+#     mode: '0755'
+
+# - name: Download Node Exporter dashboard JSON
+#   get_url:
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+# - name: Read the downloaded JSON file
+#   slurp:
+#     src: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: dashboard_json
+
+# - name: Prepare dashboard import payload
+#   set_fact:
+#     dashboard_payload: >-
+#       {
+#         "dashboard": {{ dashboard_json.content | b64decode | from_json | to_json }},
+#         "overwrite": true,
+#         "folderId": 0
+#       }
+
+# - name: Import Grafana dashboard foo
+#   uri:
+#     url: "https://{{subdomain}}.{{domain}}/grafana/api/dashboards/db"
+#     method: POST
+#     user: "admin"
+#     password: "admin"
+#     force_basic_auth: yes
+#     headers:
+#       Content-Type: "application/json"
+#     body: "{{ lookup('file', '/var/lib/grafana/dashboards/node_exporter_full.json') | to_json }}"
+#     status_code: 200
+#   register: result
+
+# - debug:
+#     var: result
+
+
+##############
+
+
+# - name: Import Grafana dashboard foo
+#   uri:
+#     url: "https://{{subdomain}}.{{domain}}/grafana"
+#     url_user: "admin"
+#     url_password: "admin"
+#     state: present
+#     commit_message: Updated by ansible
+#     overwrite: true
+#     path: /var/lib/grafana/dashboards/node_exporter_full.json
+
+
+
+# - name: Import Node Exporter dashboard to Grafana
+#   get_url: 
+#     url: "https://{{subdomain}}.{{domain}}/grafana"
+#     # dest: /var/lib/grafana/dashboards/node_exporter_full.json
+#     # dest: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     url_user: "admin"
+#     url_password: "admin"
+#     # dashboard_url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     state: present
+
+####################
+
+
+
+
+# - name: Import Node Exporter dashboard to Grafana
+#   get_url: 
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
 
 
 # - name: Import Node Exporter dashboard to Grafana
@@ -191,19 +648,47 @@
 #     # dashboard_url: https://grafana.com/api/dashboards/1860/revisions/37/download
 
 
-- name: Configure Nginx for WordPress and Grafana
-  template:
-    src: wordpress-grafana-nginx.conf.j2
-    dest: /etc/nginx/sites-available/default
-  notify:
-    - Reload Nginx
 
-- name: Ensure Nginx default site is enabled
-  file:
-    src: /etc/nginx/sites-available/default
-    dest: /etc/nginx/sites-enabled/default
-    state: link
-  notify:
-    - Reload Nginx
+##2
+
+# - name: Configure Nginx for WordPress and Grafana
+#   template:
+#     src: wordpress-grafana-nginx.conf.j2
+#     dest: /etc/nginx/sites-available/default
+#   notify:
+#     - Reload Nginx
+
+# - name: Ensure Nginx default site is enabled
+#   file:
+#     src: /etc/nginx/sites-available/default
+#     dest: /etc/nginx/sites-enabled/default
+#     state: link
+#   notify:
+#     - Reload Nginx
 
 
+##work
+# - name: Ensure Grafana dashboards directory exists
+#   file:
+#     path: /var/lib/grafana/dashboards
+#     state: directory
+#     mode: '0755'
+
+# - name: Download Node Exporter dashboard JSON
+#   get_url:
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+# - name: Read the downloaded JSON file
+#   slurp:
+#     src: /var/lib/grafana/dashboards/node_exporter_full.json
+#   register: dashboard_json
+
+# - name: Prepare dashboard import payload
+#   set_fact:
+#     dashboard_payload: >-
+#       {
+#         "dashboard": {{ dashboard_json.content | b64decode | from_json | to_json }},
+#         "overwrite": true,
+#         "folderId": 0
+#       }

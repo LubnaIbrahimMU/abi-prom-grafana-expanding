@@ -6,3 +6,8 @@ ansible-vault encrypt main.yml
 ansible-inventory -i demo.aws_ec2.yml --graph
 
 
+curl -u admin:admin -X POST https://labi.cloud-stacks.com/grafana/api/dashboards/db -H "Content-Type: application/json" -d '{"dashboard": {}, "overwrite": true, "folderId": 0}'
+
+
+
+sudo certbot --nginx -d labi.cloud-stacks.com

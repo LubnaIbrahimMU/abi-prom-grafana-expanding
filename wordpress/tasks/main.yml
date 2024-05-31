@@ -89,11 +89,40 @@
     mode: '0644'
 
 
+##certbot
 
 
 
+- name: Install Certbot and dependencies
+  apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: yes
+
+- name: Obtain SSL certificate
+  command: >
+    certbot --nginx -d labi.cloud-stacks.com --non-interactive --agree-tos --email lubnaibrahim000@gmail.com
+  args:
+    creates: /etc/letsencrypt/live/labi.cloud-stacks.com/fullchain.pem
+  notify: Reload Nginx
+
+##ignore
 
 
+# - name: Configure Nginx for SSL
+#   template:
+#     src: nginx_ssl.j2
+#     dest: /etc/nginx/sites-available/labi.cloud-stacks.com
+#   notify: Reload Nginx
+
+# - name: Enable Nginx site configuration
+#   file:
+#     src: /etc/nginx/sites-available/labi.cloud-stacks.com
+#     dest: /etc/nginx/sites-enabled/labi.cloud-stacks.com
+#     state: link
+#   notify: Reload Nginx
 
 
 

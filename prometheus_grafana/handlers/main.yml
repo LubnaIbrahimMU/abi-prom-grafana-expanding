@@ -18,3 +18,9 @@
   service:
     name: nginx
     state: reloaded
+
+
+- name: Reload Nginx
+  service:
+    name: nginx
+    state: reloaded
