@@ -1,0 +1,14 @@
+---
+# defaults file for ec2
+
+key_name: lu2
+ec2_instance_type: t3.small
+ec2_ami: ami-04b70fa74e45c3917
+aws_region: us-east-1
+security_groups: sg-03f7b5c7eb4c4f754
+# security_groups: sg-03f0888981f597ccb
+# security_group1: sg-03f0888981f597ccb
+# security_group2: sg-03f7b5c7eb4c4f754
+subnet_id: subnet-0a39a6b8000e941af
+# subnet_id: subnet-0529923ee742e93d5
+ec2_name: lu_press

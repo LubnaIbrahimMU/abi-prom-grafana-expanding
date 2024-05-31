@@ -1,0 +1,25 @@
+---
+# tasks file for manage
+
+
+- name: Stop EC2 instance
+  amazon.aws.ec2_instance:
+    instance_ids: "{{ Instance_ID }}"
+    state: stopped
+  tags:
+    - stop
+
+- name: Start EC2 instance
+  amazon.aws.ec2_instance:
+    instance_ids: "{{ Instance_ID }}"
+    state: running
+  tags: 
+    - start
+
+
+- name: Terminate EC2 instance
+  amazon.aws.ec2_instance:
+    instance_ids: "{{ Instance_ID }}"
+    state: absent
+  tags:
+    - terminate

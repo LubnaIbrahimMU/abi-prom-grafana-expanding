@@ -1,0 +1,20 @@
+---
+# handlers file for prometheus_grafana
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+
+- name: Restart Prometheus
+  systemd:
+    name: prometheus
+    state: restarted
+
+- name: Restart Grafana
+  systemd:
+    name: grafana-server
+    state: restarted
+
+- name: Reload Nginx
+  service:
+    name: nginx
+    state: reloaded

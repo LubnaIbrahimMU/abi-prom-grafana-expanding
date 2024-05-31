@@ -1,0 +1,136 @@
+---
+# tasks file for wordpress
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Ensure PHP repository is added
+  apt_repository:
+    repo: ppa:ondrej/php
+    state: present
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name: 
+      - nginx
+      - php8.1-fpm
+      - php8.1-mysql
+      - php8.1-curl
+      - php8.1-gd
+      - php8.1-mbstring
+      - php8.1-xml
+      - php8.1-xmlrpc
+    state: present
+
+- name: Ensure PHP8.1-FPM is started and enabled
+  service:
+    name: php8.1-fpm
+    state: started
+    enabled: yes
+
+- name: Ensure PHP MySQL extension is enabled
+  shell: |
+    phpenmod mysqli
+  notify:
+    - Restart PHP8.1-FPM
+
+- name: Download WordPress
+  get_url:
+    url: https://wordpress.org/latest.tar.gz
+    dest: /tmp/wordpress.tar.gz
+
+- name: Extract WordPress
+  unarchive:
+    src: /tmp/wordpress.tar.gz
+    dest: /usr/share
+    remote_src: yes
+
+- name: Configure Nginx for WordPress
+  template:
+    src: wordpress.conf.j2
+    dest: /etc/nginx/sites-available/wordpress
+  notify:
+    - Reload Nginx
+
+- name: Enable WordPress site
+  file:
+    src: /etc/nginx/sites-available/wordpress
+    dest: /etc/nginx/sites-enabled/wordpress
+    state: link
+  notify:
+    - Reload Nginx
+
+- name: Remove default site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify:
+    - Reload Nginx
+
+- name: Ensure WordPress directory ownership
+  file:
+    path: /usr/share/wordpress
+    owner: www-data
+    group: www-data
+    state: directory
+    recurse: yes
+
+- name: Configure WordPress wp-config.php
+  template:
+    src: wp-config.php.j2
+    dest: /usr/share/wordpress/wp-config.php
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

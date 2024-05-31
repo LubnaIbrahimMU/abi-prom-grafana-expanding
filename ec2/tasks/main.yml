@@ -1,0 +1,238 @@
+---
+# tasks file for ec2
+
+
+
+
+# Check if the key.pem file exists
+- name: Check if key.pem file exists
+  stat:
+    path: "{{ key_name }}"
+  register: key_file
+
+# Create the key pair if the key.pem file doesn't exist
+- name: Create Key Pair
+  ec2_key:
+    name: "{{ key_name }}"
+    region: "{{ aws_region }}"
+  register: key_pair
+  when: not key_file.stat.exists
+
+# Save the private key locally if the key pair was created
+- name: Save Private Key Locally
+  copy:
+    content: "{{ key_pair.key.private_key }}"
+    dest: "{{ key_name }}"
+    mode: 0400
+  when:
+    - key_pair is defined
+    - key_pair.changed
+
+
+#Not necessary
+
+- name: Check for existing EC2 instances
+  amazon.aws.ec2_instance_info:
+    filters:
+      "tag:Name": "{{ ec2_name }}"
+      "instance-state-name": "running"
+  register: ec2_instances
+
+- name: Set fact to check if instances are running
+  ansible.builtin.set_fact:
+    instances_running: "{{ ec2_instances.instances | length > 0 }}"
+
+- name: Debug - Show instances running status
+  ansible.builtin.debug:
+    msg: "Instances running: {{ instances_running }}"
+
+    
+
+
+- name: Create EC2 instance
+  amazon.aws.ec2_instance:
+    key_name: "{{ key_name }}"
+    instance_type: "{{ ec2_instance_type }}"
+    image_id: "{{ ec2_ami }}"
+    wait: True
+    count: 1
+    security_groups: "{{ security_groups }}"
+    vpc_subnet_id: "{{ subnet_id }}"
+    network:
+       assign_public_ip: True
+    tags:
+      Name: "{{ ec2_name }}"
+      Environment: Production
+  register: ec2_instance
+
+- name: Pause for 5 minutes to build app cache
+  ansible.builtin.pause:
+    seconds: 20
+
+
+# - name: Wait for instance to become available
+#   wait_for:
+#     host: "{{ ec2_instance.instances[0].public_ip }}"
+#     port: 22
+#     delay: 10
+#     timeout: 300
+#   when: ec2_instance is defined
+
+# - name: Refresh EC2 dynamic inventory
+#   command: ansible-inventory -i demo.aws_ec2.yml --list
+#   register: inventory_refresh
+#   changed_when: false
+
+# - name: Debug inventory refresh output
+#   debug:
+#     var: inventory_refresh
+
+
+
+# - name: Refresh EC2 dynamic inventory
+#   command: "ansible-inventory -i demo.aws_ec2.yml --list"
+#   register: inventory_refresh
+#   changed_when: false
+
+
+# - name: Debug inventory refresh output
+#   ansible.builtin.debug:
+#     var: inventory_refresh
+
+
+# - name: Refresh EC2 dynamic inventory
+#   command: ansible-inventory --refresh-cache -i demo.aws_ec2.yml
+#   when: instances_running
+
+# - name: Create EC2 instance
+#   amazon.aws.ec2_instance:
+#     key_name: "{{ key_name }}"
+#     instance_type: "{{ ec2_instance_type }}"
+#     image_id: "{{ ec2_ami }}"
+#     wait: True
+#     count: 1
+#     security_groups: "{{ security_groups }}"
+#     vpc_subnet_id: "{{ subnet_id }}"
+#     network:
+#        assign_public_ip: True
+#     tags:
+#       Name: "{{ ec2_name }}"
+#       Environment: Production
+#   register: ec2_instance
+
+
+# - name: Get instances facts
+#   ec2_instance_info:
+#     aws_access_key: "{{ aws_access_key_id }}"
+#     aws_secret_key: "{{ aws_secret_access_key }}"
+#     region: "{{ aws_region }}"
+
+- name: Print instance IP
+  debug:
+    msg: "WordPress URL: http:// {{ ec2_instance.instances[0].public_dns_name }}"
+
+
+
+# - name: Add instance to dynamic inventory
+#   add_host:
+#     name: "{{ ec2_instance.instances[0].public_dns_name }}"
+#     groups: ec2_instances
+#     instance_id: "{{ ec2_instance.instance_ids[0] }}"
+#     ansible_host: "{{ ec2_instance.instances[0].public_dns_name }}"
+#     ansible_user: ubuntu
+
+
+
+
+- name: Print instance IP
+  debug:
+    msg: "WordPress URL: http:// {{ ec2_instance.instances[0].public_dns_name }}"
+
+# # - name: Write Instance IP to file
+#   lineinfile:
+#     path: files/output/ip.yml
+#     regexp: '^WordPress URL:'
+#     line: "WordPress URL: http:// {{ ec2_instance.instances[0].public_dns_name }}"
+#     create: yes
+
+
+# - name: Write IP and Instance ID to file
+#   lineinfile:
+#     path: files/output/ip.txt
+#     line: "WordPress URL: http:// {{ ec2_instance.instances[0].public_dns_name }}"
+#     create: yes
+
+
+- name: Add instance to dynamic inventory
+  add_host:
+    name: "{{ ec2_instance.instances[0].public_dns_name }}"
+    groups: tag_Name_{{ ec2_name }}
+    instance_id: "{{ ec2_instance.instance_ids[0] }}"
+    ansible_host: "{{ ec2_instance.instances[0].public_dns_name }}"
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: "{{ key_name }}"
+
+
+#Not necessary
+
+
+# - name: Refresh EC2 dynamic inventory
+#   command: ansible-inventory -i demo.aws_ec2.yml --list
+#   register: inventory_refresh
+#   changed_when: false
+
+
+# - name: Debug inventory refresh output
+#   ansible.builtin.debug:
+#     var: inventory_refresh
+
+
+# - name: Write IP and Instance ID to file
+#   lineinfile:
+#     path: files/output/instance_info.txt
+#     line: "Instance IP: {{ ec2_instance.instances[0].public_dns_name }}, Instance ID: {{ ec2_instance.instance_ids[0] }}"
+#     create: yes
+
+
+- name: Write Instance IP to file
+  lineinfile:
+    path: files/output/ip.yml
+    regexp: '^WordPress URL:'
+    line: "WordPress URL: http:// {{ ec2_instance.instances[0].public_dns_name }}"
+    create: yes
+
+# - name: Write IP and Instance ID to file
+#   lineinfile:
+#     path: manage/defaults/main.yml
+#     line: "Instance_ID: {{ ec2_instance.instance_ids[0] }}"
+#     create: yes
+
+
+
+- name: Write Instance ID to file
+  lineinfile:
+    path: manage/defaults/main.yml
+    regexp: '^Instance_ID:'
+    line: "Instance_ID: {{ ec2_instance.instance_ids[0] }}"
+    create: yes
+
+
+# - name: Write IP and Instance ID to file
+#   lineinfile:
+#     path: files/output/instance_info.txt
+#     line: "Instance IP: {{ ec2_instance.instances[0].public_dns_name }}, Instance ID: {{ ec2_instance.instance_ids[0] }}"
+#     create: yes
+
+# - name: Write IP and Instance ID to file
+#   lineinfile:
+#     path: inventory
+#     line: "[ec2_instances]: {{ ec2_instance.instances[0].public_dns_name }}"
+#     create: yes
+
+# - name: Write IP and Instance ID to file
+#   lineinfile:
+#     path: manage/defaults/main.yml
+#     line: "Instance_ID: {{ ec2_instance.instance_ids[0] }}"
+#     create: yes
+
+

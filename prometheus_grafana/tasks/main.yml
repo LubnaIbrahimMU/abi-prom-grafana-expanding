@@ -1,0 +1,209 @@
+---
+#prometheus_grafana
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - prometheus
+      - prometheus-node-exporter
+      - nginx
+      - software-properties-common
+      - apt-transport-https
+      - apache2-utils  # For htpasswd
+    state: present
+
+- name: Add Grafana APT key
+  apt_key:
+    url: https://packages.grafana.com/gpg.key
+    state: present
+
+- name: Add Grafana APT repository
+  apt_repository:
+    repo: "deb https://packages.grafana.com/oss/deb stable main"
+    state: present
+
+- name: Update apt cache after adding Grafana repo
+  apt:
+    update_cache: yes
+
+- name: Install Grafana
+  apt:
+    name: grafana
+    state: present
+
+- name: Enable and start Prometheus service
+  systemd:
+    name: prometheus
+    enabled: yes
+    state: started
+
+- name: Enable and start Node Exporter service
+  systemd:
+    name: prometheus-node-exporter
+    enabled: yes
+    state: started
+
+- name: Enable and start Grafana service
+  systemd:
+    name: grafana-server
+    enabled: yes
+    state: started
+
+- name: Configure Prometheus
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+  notify:
+    - Restart Prometheus
+
+- name: Configure Grafana
+  template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+  notify:
+    - Restart Grafana
+
+# - name: Add Prometheus as a Grafana datasource
+#   grafana_datasource:
+#     name: Prometheus
+#     datasource:
+#       type: prometheus
+#       url: http://localhost:3000/grafana
+#       grafana_user: "admin"
+#       grafana_password: "admin"
+#       org_id: "1"
+#       ds_type: "prometheus"
+#       ds_url: http://localhost:9090
+#       access: proxy
+#     state: present
+
+- name: Add Prometheus as a Grafana datasource
+  community.grafana.grafana_datasource:
+    name: "Prometheus"
+    grafana_url: http://localhost:3000/grafana
+    grafana_user: "admin"
+    grafana_password: "admin"
+    ds_type: "prometheus"
+    ds_url: http://localhost:9090
+
+
+  
+
+# - name: Import Node Exporter dashboard to Grafana
+#   grafana_dashboard: 
+#     name: "Node Exporter Full"
+#     src: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+# - name: Import Node Exporter dashboard to Grafana
+#   get_url: 
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+- name: Ensure Grafana dashboards directory exists
+  file:
+    path: /var/lib/grafana/dashboards
+    state: directory
+    mode: '0755'
+
+- name: Download Node Exporter dashboard JSON
+  get_url:
+    url: https://grafana.com/api/dashboards/1860/revisions/37/download
+    dest: /var/lib/grafana/dashboards/node_exporter_full.json
+
+- name: Read the downloaded JSON file
+  slurp:
+    src: /var/lib/grafana/dashboards/node_exporter_full.json
+  register: dashboard_json
+
+- name: Prepare dashboard import payload
+  set_fact:
+    dashboard_payload: >-
+      {
+        "dashboard": {{ dashboard_json.content | b64decode | from_json | to_json }},
+        "overwrite": true,
+        "folderId": 0
+      }
+
+
+# - name: Import Node Exporter dashboard to Grafana
+#   uri: 
+#     url: http://localhost:3000/grafana
+#     method: POST
+#     url_username: "admin"
+#     url_password : "admin"
+#     # dashboard_url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     # path: /var/lib/grafana/dashboards/node_exporter_full.json
+#     # state: present
+#     force_basic_auth: yes
+#     headers:
+#       Content-Type: "application/json"
+#     body_format: json
+#     body: "{{ dashboard_json.content | b64decode | from_json | to_json }}"
+#   register: result
+
+# - debug:
+#     var: result
+
+
+
+# - name: Import Node Exporter dashboard to Grafana
+#   uri:
+#     url: http://localhost:3000/grafana
+#     method: POST
+#     user: "admin"
+#     password: "admin"
+#     force_basic_auth: yes
+#     headers:
+#       Content-Type: "application/json"
+#     body_format: json
+#     body: "{{ dashboard_json.content | b64decode | from_json | to_json }}"
+#   register: result
+
+# - debug:
+#     var: result
+
+# - name: Import Node Exporter dashboard to Grafana
+#   uri:
+#     url: http://localhost:3000/grafana
+#     method: POST
+#     user: "admin"
+#     password: "admin"
+
+
+
+# - name: Download Grafana dashboard JSON
+#   get_url:
+#     url: https://grafana.com/api/dashboards/1860/revisions/37/download
+#     dest: /tmp/grafana_dashboard.json
+
+
+# - name: Import Grafana dashboard 
+#   uri:
+#   # community.grafana.grafana_dashboard:
+#     url: http://localhost:3000/grafana
+#     grafana_user: "admin"
+#     grafana_password: "admin"
+#     # dashboard_url: https://grafana.com/api/dashboards/1860/revisions/37/download
+
+
+- name: Configure Nginx for WordPress and Grafana
+  template:
+    src: wordpress-grafana-nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+  notify:
+    - Reload Nginx
+
+- name: Ensure Nginx default site is enabled
+  file:
+    src: /etc/nginx/sites-available/default
+    dest: /etc/nginx/sites-enabled/default
+    state: link
+  notify:
+    - Reload Nginx
+
+

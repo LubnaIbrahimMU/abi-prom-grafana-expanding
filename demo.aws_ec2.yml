@@ -1,0 +1,36 @@
+# plugin: amazon.aws.aws_ec2
+
+# regions:
+#   - us-east-1
+
+# filters:
+#   tag:Name: lu_press
+
+
+# keyed_groups:
+#   # add hosts to tag_Name_value groups for each aws_ec2 host's tags.Name variable.
+#   - key: tags.Name
+#     prefix: tag_Name_
+#     separator: ""
+
+
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+
+# filters:
+#   tag:Name: "{{ ec2_name }}"
+
+filters:
+  instance-state-name: running
+
+keyed_groups:
+  # Add hosts to tag_Name_value groups for each aws_ec2 host's tags.Name variable.
+  - key: tags.Name
+    prefix: tag_Name_
+    separator: ""
+hostnames:
+  - tag:Name
+compose:
+  ansible_host: public_ip_address
+

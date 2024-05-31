@@ -1,0 +1,123 @@
+---
+- name: EC2 instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - ec2
+  tags: ec2
+
+
+- name: wait for a while 
+  hosts: localhost
+  tags: wait
+  tasks:
+    - name: Wait for EC2 instance to become reachable
+      wait_for:
+        host: "{{ ec2_instance.instances[0].public_dns_name }}"
+        port: 22
+        state: started
+        delay: 50
+        timeout: 300
+
+
+- name: install-mysql
+  hosts: tag_Name_{{ ec2_name }}
+  remote_user: ubuntu
+  become: yes
+  roles:
+   - mysql
+  tags: 
+    - mysql
+    - install
+
+
+
+- name: install-wordpress 
+  hosts: tag_Name_{{ ec2_name }}
+  remote_user: ubuntu
+  become: yes
+  roles:
+   - wordpress
+  tags:
+    - wordpress
+    - install
+
+
+
+- name: install-prometheus_grafana
+  hosts: tag_Name_{{ ec2_name }}
+  remote_user: ubuntu
+  become: yes
+  roles:
+   - prometheus_grafana
+  tags:
+    - pro
+    - install
+
+
+
+
+
+
+
+- name: Print instance IP
+  hosts: localhost
+  gather_facts: false
+  tags: ip
+  tasks:
+    - name: Load EC2 instance output variables
+      include_vars:
+        file: files/output/ip.yml
+
+    # - name: Set instance IP
+    #   set_fact:
+    #     instance_ip: "{{ ec2_instance_output.instances[0].public_dns_name }}"
+
+    - name: Display instance IP
+      debug:
+        msg: "WordPress URL: http://{{ ec2_instance.instances[0].public_dns_name }}"
+
+
+# - name: Copy the IP
+#   hosts: localhost
+#   tags: ip
+#   tasks:
+#     # - name: Run EC2 IP
+#     #   include_role:
+#     #     name: ec2
+#     #   register: ec2_instance
+
+#     - name: Print instance IP
+#       debug:
+#         msg: "WordPress URL: http://{{ ec2_instance.instances[0].public_dns_name }}"
+
+
+# - name: Create EC2 instances
+#   hosts: localhost
+#   roles:
+#     - ec2
+#   register: ec2_instance
+
+# - name: Print instance IP
+#   debug:
+#     msg: "WordPress URL: http://{{ ec2_instance.instances[0].public_dns_name }}"
+
+# - name: EC2 instance
+#   hosts: ec2
+#   tags: ip
+#   tasks:
+#     - name: Print instance IP
+#       debug:
+#         msg: "WordPress URL: http://{{ ec2_instance.instances[0].public_ip_address }}"
+
+
+
+
+# - name: EC2 manage
+#   hosts: localhost
+#   roles:
+#     - manage
+
+
+

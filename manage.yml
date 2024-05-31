@@ -1,0 +1,7 @@
+---
+
+- name: EC2 manage
+  hosts: localhost
+  roles:
+    - manage
+

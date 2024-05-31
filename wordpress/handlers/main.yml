@@ -1,0 +1,23 @@
+---
+# handlers file for wordpress
+
+
+
+- name: Restart PHP8.1-FPM
+  service:
+    name: php8.1-fpm
+    state: restarted
+
+
+- name: Reload Nginx
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Restart Nginx
+  service:
+    name: nginx
+    state: restarted
+
+
+
